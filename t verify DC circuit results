@@ -1,0 +1,24 @@
+[1mdiff --git a/test_electrical.py b/test_electrical.py[m
+[1mindex e69de29..09dd10e 100644[m
+[1m--- a/test_electrical.py[m
+[1m+++ b/test_electrical.py[m
+[36m@@ -0,0 +1,18 @@[m
+[32m+[m[32mimport unittest[m
+[32m+[m[32mfrom electrical import analyze_dc[m
+[32m+[m
+[32m+[m
+[32m+[m[32mclass TestDCAnalyzer(unittest.TestCase):[m
+[32m+[m[32m    def test_known_values(self):[m
+[32m+[m[32m        result = analyze_dc(12, 6)[m
+[32m+[m[32m        self.assertAlmostEqual(result["current_a"], 2.0)[m
+[32m+[m[32m        self.assertAlmostEqual(result["power_w"], 24.0)[m
+[32m+[m
+[32m+[m[32m    def test_zero_voltage(self):[m
+[32m+[m[32m        result = analyze_dc(0, 10)[m
+[32m+[m[32m        self.assertAlmostEqual(result["current_a"], 0.0)[m
+[32m+[m[32m        self.assertAlmostEqual(result["power_w"], 0.0)[m
+[32m+[m
+[32m+[m
+[32m+[m[32mif __name__ == "__main__":[m
+[32m+[m[32m    unittest.main()[m
+\ No newline at end of file[m
