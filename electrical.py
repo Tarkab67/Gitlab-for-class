@@ -1,20 +1,10 @@
 def analyze_dc(voltage_v, resistance_ohm):
-    if resistance_ohm == 0:
-        raise ValueError("ความต้านทานต้องไม่เป็น 0")
-    if voltage_v < 0 or resistance_ohm < 0:
-        raise ValueError("แรงดันและความต้านทานต้องเป็นค่าบวก")
+    if resistance_ohm <= 0:
+        raise ValueError("Resistance must be positive")
 
     current_a = voltage_v / resistance_ohm
     power_w = voltage_v * current_a
     return {"current_a": current_a, "power_w": power_w}
-
-
-def _read_float(prompt_text):
-    while True:
-        try:
-            return float(input(prompt_text))
-        except ValueError:
-            print("กรุณากรอกตัวเลขที่ถูกต้อง")
 
 
 if __name__ == "__main__":
