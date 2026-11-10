@@ -84,6 +84,80 @@ def solve_bias(inputs: BiasInputs) -> BiasResult:
     )
 
 
+CROSS_FIELDS = ("ib", "ic", "ie", "vce")
+
+
+def _solve_linear(matrix: list[list[float]], rhs: list[float]) -> list[float]:
+    """Gaussian elimination with partial pivoting (stdlib only)."""
+    n = len(matrix)
+    a = [list(row) + [rhs[i]] for i, row in enumerate(matrix)]
+    for col in range(n):
+        pivot = max(range(col, n), key=lambda r: abs(a[r][col]))
+        if a[pivot][col] == 0.0:
+            raise ValueError("singular system")
+        if pivot != col:
+            a[col], a[pivot] = a[pivot], a[col]
+        pivot_value = a[col][col]
+        for row in range(col + 1, n):
+            factor = a[row][col] / pivot_value
+            if factor == 0.0:
+                continue
+            for c in range(col, n + 1):
+                a[row][c] -= factor * a[col][c]
+    solution = [0.0] * n
+    for row in range(n - 1, -1, -1):
+        total = a[row][n] - sum(a[row][c] * solution[c] for c in range(row + 1, n))
+        solution[row] = total / a[row][row]
+    return solution
+
+
+def nodal_solve(inputs: BiasInputs) -> BiasResult:
+    """Independent solution: KCL at the three nodes, solved as a 6x6 system.
+
+    Unknowns are ordered [IB, IC, IE, VB, VC, VE].
+    """
+    g1 = 1.0 / inputs.r1
+    g2 = 1.0 / inputs.r2
+    gc = 1.0 / inputs.rc
+    ge = 1.0 / inputs.re
+    beta = inputs.beta
+
+    rows = [
+        [-beta, 1.0, 0.0, 0.0, 0.0, 0.0],
+        [-(beta + 1.0), 0.0, 1.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0, 0.0, -1.0],
+        [-1.0, 0.0, 0.0, -(g1 + g2), 0.0, 0.0],
+        [0.0, -1.0, 0.0, 0.0, -gc, 0.0],
+        [0.0, 0.0, -1.0, 0.0, 0.0, ge],
+    ]
+    rhs = [0.0, 0.0, inputs.vbe, -inputs.vcc * g1, -inputs.vcc * gc, 0.0]
+
+    ib, ic, ie, vb, vc, ve = _solve_linear(rows, rhs)
+    return BiasResult(
+        vb=vb,
+        ve=ve,
+        vc=vc,
+        vce=vc - ve,
+        ib=ib,
+        ic=ic,
+        ie=ie,
+        region="",
+        message="nodal",
+    )
+
+
+def cross_check(closed: BiasResult, nodal: BiasResult, rel_tol: float = 1e-9) -> tuple[bool, float]:
+    """Return (agree, worst relative difference) over currents and VCE."""
+    worst = 0.0
+    for field in CROSS_FIELDS:
+        a = getattr(closed, field)
+        b = getattr(nodal, field)
+        denominator = max(abs(a), abs(b), 1e-30)
+        worst = max(worst, abs(a - b) / denominator)
+    return worst <= rel_tol, worst
+
+
+
 
 @dataclass(frozen=True)
 class BiasInputs:

@@ -3,6 +3,7 @@ import unittest
 
 from bjt_ce_bias.bjt import BiasInputs, parse_inputs
 from bjt_ce_bias.bjt import VCE_SAT, classify_vce, solve_bias
+from bjt_ce_bias.bjt import BiasResult, cross_check, nodal_solve
 
 DEFAULTS = BiasInputs(vcc=12.0, r1=100e3, r2=22e3, rc=2.2e3, re=1e3, beta=100.0, vbe=0.7)
 
@@ -85,3 +86,28 @@ class TestSolveBias(unittest.TestCase):
     def test_saturation_boundary_is_strict(self):
         self.assertEqual(classify_vce(0.3), "active")
         self.assertEqual(classify_vce(0.2999999), "saturation")
+
+
+class TestNodalSolve(unittest.TestCase):
+    def test_matches_closed_form_on_active_case(self):
+        closed = solve_bias(DEFAULTS)
+        nodal = nodal_solve(DEFAULTS)
+        agree, diff = cross_check(closed, nodal)
+        self.assertTrue(agree)
+        self.assertLess(diff, 1e-9)
+
+    def test_nodal_solution_satisfies_kcl(self):
+        nodal = nodal_solve(DEFAULTS)
+        i_r1 = (12.0 - nodal.vb) / 100e3
+        i_r2 = nodal.vb / 22e3
+        self.assertAlmostEqual(i_r1 - i_r2, nodal.ib, delta=1e-12)
+        self.assertAlmostEqual((12.0 - nodal.vc) / 2.2e3, nodal.ic, delta=1e-12)
+        self.assertAlmostEqual(nodal.ve / 1e3, nodal.ie, delta=1e-12)
+
+    def test_detects_a_wrong_solution(self):
+        closed = solve_bias(DEFAULTS)
+        nodal = nodal_solve(DEFAULTS)
+        broken = BiasResult(**{**nodal.__dict__, "ic": nodal.ic * 1.01})
+        agree, diff = cross_check(closed, broken)
+        self.assertFalse(agree)
+        self.assertGreater(diff, 1e-4)
