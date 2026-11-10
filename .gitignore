@@ -2,3 +2,6 @@ __pycache__/
 *.pyc
 .venv/
 .env
+
+# Local OpenCode plugin (vendored, not committed — see .opencode/README.md)
+.opencode/superpowers/
