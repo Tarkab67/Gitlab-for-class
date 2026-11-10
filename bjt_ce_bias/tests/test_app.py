@@ -59,5 +59,19 @@ class TestResultsPage(unittest.TestCase):
         self.assertIn("overstates IC", html)
 
 
+class TestSchematic(unittest.TestCase):
+    def test_svg_shows_current_values(self):
+        html = app.test_client().post("/", data=VALID_FORM).get_data(as_text=True)
+        start = html.index('<svg id="schematic"')
+        svg = html[start:html.index("</svg>", start)]
+        for text in ("12 V", "100 kΩ", "22 kΩ", "2.2 kΩ", "1 kΩ", "β = 100", "Q1"):
+            self.assertIn(text, svg)
+
+    def test_svg_uses_typed_values(self):
+        html = app.test_client().post("/", data={**VALID_FORM, "rc": "4.7"}).get_data(as_text=True)
+        start = html.index('<svg id="schematic"')
+        self.assertIn("4.7 kΩ", html[start:html.index("</svg>", start)])
+
+
 if __name__ == "__main__":
     unittest.main()

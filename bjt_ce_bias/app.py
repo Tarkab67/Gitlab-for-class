@@ -5,7 +5,7 @@ from __future__ import annotations
 from flask import Flask, render_template, request
 
 from bjt_ce_bias.bjt import parse_inputs, solve_bias
-from bjt_ce_bias.formatting import format_quantity
+from bjt_ce_bias.formatting import format_compact, format_quantity
 
 DEFAULT_FORM = {
     "vcc": "12.0",
@@ -41,13 +41,25 @@ def _result_rows(result):
     ]
 
 
-def _render(form, errors, result=None):
+def _schematic(inputs):
+    labels = {}
+    for field in ("vcc", "r1", "r2", "rc", "re"):
+        display, unit = format_compact(field, getattr(inputs, field))
+        labels[field] = f"{display} {unit}".strip()
+    labels["beta"] = f"{inputs.beta:.6g}"
+    return labels
+
+
+def _render(form, errors, result=None, inputs=None):
+    if inputs is None:
+        inputs, _ = parse_inputs(DEFAULT_FORM)
     return render_template(
         "index.html",
         form=form,
         errors=errors,
         result=result,
         rows=_result_rows(result) if result is not None else [],
+        schematic=_schematic(inputs),
     )
 
 
@@ -60,7 +72,7 @@ def index():
     inputs, errors = parse_inputs(form)
     if inputs is None:
         return _render(form, errors)
-    return _render(form, {}, solve_bias(inputs))
+    return _render(form, {}, solve_bias(inputs), inputs)
 
 
 if __name__ == "__main__":

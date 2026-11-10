@@ -150,6 +150,12 @@ body {
 
 .schematic { display: flex; justify-content: center; }
 .schematic svg { width: 100%; max-width: 340px; height: auto; }
+.schematic text { font-family: "Segoe UI", Tahoma, sans-serif; font-size: 11px; fill: var(--ink); }
+.schematic .lbl { font-weight: 600; }
+.schematic .val { fill: var(--teal); font-family: Consolas, monospace; font-size: 10.5px; }
+.schematic .wire { stroke: var(--ink); stroke-width: 1.6; fill: none; }
+.schematic .part { stroke: var(--ink); stroke-width: 1.6; fill: #fff; }
+.schematic .arrow { fill: var(--ink); }
 
 .placeholder { color: var(--muted); font-size: 14px; }
 
