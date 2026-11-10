@@ -7,4 +7,7 @@ DC Circuit Calculator (โปรแกรมคำนวณวงจรไฟฟ
 
 วัตถุประสงค์: เพื่อคำนวณค่ากระแสไฟฟ้า (Current) ความต่างศักย์ (Voltage) และกำลังไฟฟ้า (Power) รวมของวงจรตัวต้านทานได้อย่างถูกต้องและรวดเร็ว
 ## Lab 02: BJT DC Bias Web App (ENG29 2121)
-Flask app in `bjt_ce_bias/` - run `.venv\Scripts\python -m bjt_ce_bias.app` and open http://127.0.0.1:5000.
+
+Flask app: `bjt_ce_bias/` (calculation engine, Flask routes, tests, lab README).
+
+Run `.venv\Scripts\python -m bjt_ce_bias.app`, then open http://127.0.0.1:5000.

@@ -45,8 +45,9 @@ To enable it, drop a portable ngspice build under `.tools/` (gitignored):
 
 ```powershell
 mkdir .tools
-tar -xf ngspice-47_64.7z -C .tools
-# binary ends up at .tools/Spice64/bin/ngspice_con.exe
+tar -xf ngspice-47_64.7z -C .tools\ngspice
+# Windows 10+ tar (bsdtar) reads .7z; alternatively use 7-Zip.
+# Binary: .tools\ngspice\Spice64\bin\ngspice_con.exe
 ```
 
 Lookup order: `NGSPICE_BIN` environment variable → `ngspice` on `PATH` →

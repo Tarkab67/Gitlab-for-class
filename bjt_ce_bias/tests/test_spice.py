@@ -13,9 +13,23 @@ class TestNetlist(unittest.TestCase):
                      "RE e 0 1000.0", "Q1 c b e QNPN", "BF=100", ".control", "op"):
             self.assertIn(line, net)
 
+    def test_netlist_keeps_small_resistor_values(self):
+        net = spice.build_netlist(BiasInputs(12.0, 1e-3, 22e3, 2.2e3, 1e-3, 100.0, 0.7))
+        self.assertIn("R1 vcc b 0.001", net)
+        self.assertIn("RE e 0 0.001", net)
+
     def test_missing_ngspice_is_reported_not_raised(self):
-        self.assertFalse(spice.available() and spice.find_ngspice() is None)
-        if not spice.available():
+        from unittest.mock import patch
+        with patch("bjt_ce_bias.spice.find_ngspice", return_value=None):
+            self.assertFalse(spice.available())
+            self.assertIsNone(spice.run_operating_point(INPUTS))
+
+    def test_timeout_returns_none(self):
+        import subprocess
+        from unittest.mock import patch
+        with patch("bjt_ce_bias.spice.find_ngspice", return_value="ngspice"), \
+             patch("bjt_ce_bias.spice.subprocess.run",
+                   side_effect=subprocess.TimeoutExpired("ngspice", 1)):
             self.assertIsNone(spice.run_operating_point(INPUTS))
 
     @unittest.skipUnless(spice.available(), "ngspice not installed")

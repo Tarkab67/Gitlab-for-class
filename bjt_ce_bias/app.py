@@ -104,6 +104,18 @@ def _verdict_context(result, inputs):
     }
 
 
+def _schematic_inputs(form, errors):
+    """Keep every valid typed value; fall back per field only for rejected ones."""
+    candidate = dict(form)
+    for field in errors:
+        if field in DEFAULT_FORM:
+            candidate[field] = DEFAULT_FORM[field]
+    inputs, _ = parse_inputs(candidate)
+    if inputs is None:
+        inputs, _ = parse_inputs(DEFAULT_FORM)
+    return inputs
+
+
 def _render(form, errors, result=None, inputs=None):
     if inputs is None:
         inputs, _ = parse_inputs(DEFAULT_FORM)
@@ -127,8 +139,13 @@ def index():
     form = {**DEFAULT_FORM, **request.form.to_dict()}
     inputs, errors = parse_inputs(form)
     if inputs is None:
-        return _render(form, errors)
-    return _render(form, {}, solve_bias(inputs), inputs)
+        return _render(form, errors, inputs=_schematic_inputs(form, errors))
+    try:
+        result = solve_bias(inputs)
+    except ValueError:
+        message = "These values do not produce a finite operating point; check the magnitudes."
+        return _render(form, {"form": message}, inputs=inputs)
+    return _render(form, {}, result, inputs)
 
 
 if __name__ == "__main__":

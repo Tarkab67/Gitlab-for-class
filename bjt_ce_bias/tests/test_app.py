@@ -74,15 +74,44 @@ class TestSchematic(unittest.TestCase):
 
 
 class TestCrossCheckBlock(unittest.TestCase):
+    def setUp(self):
+        self.client = app.test_client()
+
     def test_nodal_row_rendered(self):
-        html = app.test_client().post("/", data=VALID_FORM).get_data(as_text=True)
-        self.assertIn("Nodal", html)
-        self.assertIn("1.230", html)
+        html = self.client.post("/", data=VALID_FORM).get_data(as_text=True)
+        block = html[html.index('class="crosscheck"'):]
+        self.assertIn("Nodal", block)
+        self.assertIn("1.230", block)
+
+    def test_cutoff_shows_crosscheck_not_applicable(self):
+        html = self.client.post("/", data={**VALID_FORM, "r2": "1"}).get_data(as_text=True)
+        self.assertIn("the transistor is off", html)
+        self.assertNotIn("Nodal KCL solve", html)
+
+    def test_overflow_input_is_rejected_not_nan(self):
+        html = self.client.post(
+            "/", data={**VALID_FORM, "r1": "1e306", "r1_unit": "kohm"}
+        ).get_data(as_text=True)
+        self.assertIn("too large", html)
+        self.assertNotIn("nan", html)
+
+    def test_error_keeps_valid_typed_values_in_schematic(self):
+        html = self.client.post(
+            "/", data={**VALID_FORM, "vcc": "abc", "rc": "4.7"}
+        ).get_data(as_text=True)
+        start = html.index('<svg id="schematic"')
+        self.assertIn("4.7 kΩ", html[start:html.index("</svg>", start)])
+
+    def test_error_echoes_selected_unit(self):
+        html = self.client.post(
+            "/", data={**VALID_FORM, "r1_unit": "ohm", "vcc": "abc"}
+        ).get_data(as_text=True)
+        self.assertIn('value="ohm" selected', html)
 
     def test_spice_unavailable_is_graceful(self):
         from unittest.mock import patch
         with patch("bjt_ce_bias.app.spice.available", return_value=False):
-            response = app.test_client().post("/", data=VALID_FORM)
+            response = self.client.post("/", data=VALID_FORM)
             html = response.get_data(as_text=True)
         self.assertEqual(response.status_code, 200)
         self.assertIn("SPICE not available", html)
@@ -91,7 +120,7 @@ class TestCrossCheckBlock(unittest.TestCase):
         from unittest.mock import patch
         with patch("bjt_ce_bias.app.spice.available", return_value=True), \
              patch("bjt_ce_bias.app.spice.run_operating_point", side_effect=RuntimeError("boom")):
-            response = app.test_client().post("/", data=VALID_FORM)
+            response = self.client.post("/", data=VALID_FORM)
         self.assertEqual(response.status_code, 200)
         self.assertIn("SPICE check failed", response.get_data(as_text=True))
 

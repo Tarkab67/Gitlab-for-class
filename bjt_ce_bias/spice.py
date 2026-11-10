@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import os
 import re
 import shutil
@@ -60,11 +61,11 @@ def build_netlist(inputs: BiasInputs) -> str:
     return "\n".join(
         [
             "* BJT common-emitter voltage-divider bias - DC operating point",
-            f"VCC vcc 0 {inputs.vcc:.6g}",
-            f"R1 vcc b {inputs.r1:.1f}",
-            f"R2 b 0 {inputs.r2:.1f}",
-            f"RC vcc c {inputs.rc:.1f}",
-            f"RE e 0 {inputs.re:.1f}",
+            f"VCC vcc 0 {inputs.vcc!r}",
+            f"R1 vcc b {inputs.r1!r}",
+            f"R2 b 0 {inputs.r2!r}",
+            f"RC vcc c {inputs.rc!r}",
+            f"RE e 0 {inputs.re!r}",
             "Q1 c b e QNPN",
             f".model QNPN NPN (BF={inputs.beta:g} IS=1e-14 VAF=100)",
             ".control",
@@ -121,6 +122,7 @@ def run_operating_point(inputs: BiasInputs, timeout_s: float = TIMEOUT_S) -> Spi
                 capture_output=True,
                 text=True,
                 timeout=timeout_s,
+                cwd=tmp,
                 check=False,
             )
     except (OSError, subprocess.SubprocessError):
@@ -140,6 +142,8 @@ def compare(
     for field in ("ic", "vce"):
         a = getattr(closed, field)
         b = getattr(spice_result, field)
+        if not (math.isfinite(a) and math.isfinite(b)):
+            return False, math.inf
         worst = max(worst, abs(a - b) / max(abs(a), abs(b), 1e-30))
     region_ok = closed.region == classify_vce(spice_result.vce)
     return region_ok and worst <= rel_tol, worst

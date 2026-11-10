@@ -42,16 +42,22 @@ def region_message(region: str, vce: float) -> str:
         return "Cutoff: the divider cannot forward-bias the base (transistor off)."
     if region == REGION_SATURATION:
         return "Saturation: VCE is below 0.3 V; the linear model overstates IC."
-    return f"Active region approximation OK: VCE = {vce:.2f} V > 0.3 V."
+    return f"Active region approximation OK: VCE = {vce:.2f} V ≥ 0.3 V."
 
 
 def solve_bias(inputs: BiasInputs) -> BiasResult:
-    """Closed-form (Thevenin) operating point of the voltage-divider bias."""
-    vbb = inputs.vcc * inputs.r2 / (inputs.r1 + inputs.r2)
-    rb = inputs.r1 * inputs.r2 / (inputs.r1 + inputs.r2)
-    ib = (vbb - inputs.vbe) / (rb + (inputs.beta + 1.0) * inputs.re)
+    """Closed-form (Thevenin) operating point of the voltage-divider bias.
 
-    if ib <= 0.0:
+    The currents are computed from the collector side so that very large
+    beta values (where beta * IB would overflow) stay finite.
+    """
+    vbb = inputs.vcc * inputs.r2 / (inputs.r1 + inputs.r2)
+    rb = 1.0 / (1.0 / inputs.r1 + 1.0 / inputs.r2)
+    ic = (vbb - inputs.vbe) / (rb / inputs.beta + (1.0 + 1.0 / inputs.beta) * inputs.re)
+
+    if not math.isfinite(ic):
+        raise ValueError("operating point is not finite; check the input magnitudes")
+    if ic <= 0.0:
         return BiasResult(
             vb=inputs.vcc,
             ve=inputs.vcc,
@@ -64,12 +70,14 @@ def solve_bias(inputs: BiasInputs) -> BiasResult:
             message=region_message(REGION_CUTOFF, inputs.vcc),
         )
 
-    ic = inputs.beta * ib
-    ie = (inputs.beta + 1.0) * ib
+    ib = ic / inputs.beta
+    ie = ic + ib
     ve = ie * inputs.re
     vb = ve + inputs.vbe
     vc = inputs.vcc - ic * inputs.rc
     vce = vc - ve
+    if not all(math.isfinite(v) for v in (vb, ve, vc, vce, ib, ie)):
+        raise ValueError("operating point is not finite; check the input magnitudes")
     region = classify_vce(vce)
     return BiasResult(
         vb=vb,
@@ -147,11 +155,16 @@ def nodal_solve(inputs: BiasInputs) -> BiasResult:
 
 
 def cross_check(closed: BiasResult, nodal: BiasResult, rel_tol: float = 1e-9) -> tuple[bool, float]:
-    """Return (agree, worst relative difference) over currents and VCE."""
+    """Return (agree, worst relative difference) over currents and VCE.
+
+    Any non-finite operand counts as a hard disagreement, never a pass.
+    """
     worst = 0.0
     for field in CROSS_FIELDS:
         a = getattr(closed, field)
         b = getattr(nodal, field)
+        if not (math.isfinite(a) and math.isfinite(b)):
+            return False, math.inf
         denominator = max(abs(a), abs(b), 1e-30)
         worst = max(worst, abs(a - b) / denominator)
     return worst <= rel_tol, worst
@@ -183,9 +196,12 @@ def _number(raw: Mapping[str, str], field: str, errors: dict[str, str]) -> float
     return value
 
 
-def _scale(raw: Mapping[str, str], field: str) -> float:
+def _scale(raw: Mapping[str, str], field: str, errors: dict[str, str]) -> float | None:
     unit = (raw.get(f"{field}_unit") or DEFAULT_UNIT).strip().lower()
-    return UNIT_SCALE.get(unit, UNIT_SCALE[DEFAULT_UNIT])
+    scale = UNIT_SCALE.get(unit)
+    if scale is None:
+        errors[f"{field}_unit"] = "unit must be ohm or kohm"
+    return scale
 
 
 def parse_inputs(raw: Mapping[str, str]) -> tuple[BiasInputs | None, dict[str, str]]:
@@ -201,7 +217,13 @@ def parse_inputs(raw: Mapping[str, str]) -> tuple[BiasInputs | None, dict[str, s
         value = _number(raw, field, errors)
         if value is None:
             continue
-        ohms = value * _scale(raw, field)
+        scale = _scale(raw, field, errors)
+        if scale is None:
+            continue
+        ohms = value * scale
+        if not math.isfinite(ohms):
+            errors[field] = f"{field.upper()} is too large"
+            continue
         if ohms <= 0:
             errors[field] = f"{field.upper()} must be greater than 0 Ω"
             continue

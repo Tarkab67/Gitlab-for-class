@@ -47,17 +47,27 @@ class TestParseInputs(unittest.TestCase):
         self.assertIsNone(inputs)
         self.assertEqual(set(errors), {"vcc", "re"})
 
+    def test_rejects_overflow_after_unit_scaling(self):
+        inputs, errors = parse_inputs({**GOOD, "r1": "1e306", "r1_unit": "kohm"})
+        self.assertIsNone(inputs)
+        self.assertIn("r1", errors)
+
+    def test_rejects_unknown_unit_instead_of_guessing(self):
+        inputs, errors = parse_inputs({**GOOD, "r1_unit": "Mohm"})
+        self.assertIsNone(inputs)
+        self.assertIn("r1_unit", errors)
+
 
 class TestSolveBias(unittest.TestCase):
     def test_known_active_point(self):
         r = solve_bias(DEFAULTS)
-        self.assertAlmostEqual(r.ib, 12.2985e-6, delta=1e-7)
-        self.assertAlmostEqual(r.ic, 1.22985e-3, delta=1e-7)
-        self.assertAlmostEqual(r.ie, 1.24215e-3, delta=1e-7)
-        self.assertAlmostEqual(r.ve, 1.24215, delta=1e-4)
-        self.assertAlmostEqual(r.vb, 1.94215, delta=1e-4)
-        self.assertAlmostEqual(r.vc, 9.29433, delta=1e-4)
-        self.assertAlmostEqual(r.vce, 8.05218, delta=1e-4)
+        self.assertAlmostEqual(r.ib, 1.2298581462608458e-5, delta=1e-12)
+        self.assertAlmostEqual(r.ic, 1.2298581462608458e-3, delta=1e-10)
+        self.assertAlmostEqual(r.ie, 1.2421567277234543e-3, delta=1e-10)
+        self.assertAlmostEqual(r.ve, 1.2421567277234544, delta=1e-6)
+        self.assertAlmostEqual(r.vb, 1.9421567277234544, delta=1e-6)
+        self.assertAlmostEqual(r.vc, 9.29431207822614, delta=1e-5)
+        self.assertAlmostEqual(r.vce, 8.052155350502685, delta=1e-5)
         self.assertEqual(r.region, "active")
 
     def test_cutoff_when_divider_cannot_bias(self):
@@ -111,3 +121,11 @@ class TestNodalSolve(unittest.TestCase):
         agree, diff = cross_check(closed, broken)
         self.assertFalse(agree)
         self.assertGreater(diff, 1e-4)
+
+    def test_non_finite_solution_never_passes(self):
+        closed = solve_bias(DEFAULTS)
+        nodal = nodal_solve(DEFAULTS)
+        broken = BiasResult(**{**nodal.__dict__, "vce": float("nan")})
+        agree, diff = cross_check(closed, broken)
+        self.assertFalse(agree)
+        self.assertEqual(diff, math.inf)

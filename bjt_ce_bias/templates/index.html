@@ -30,7 +30,7 @@
       {% if errors %}
       <ul class="errors">
         {% for field, message in errors.items() %}
-        <li><strong>{{ field|upper }}</strong>: {{ message }}</li>
+        <li>{% if field == 'form' %}{{ message }}{% else %}<strong>{{ field|upper }}</strong>: {{ message }}{% endif %}</li>
         {% endfor %}
       </ul>
       {% endif %}
@@ -168,7 +168,10 @@
         </tbody>
       </table>
       <div class="status region-{{ result.region }}">
-        <strong>{{ result.region|capitalize }} region</strong>
+        <strong>
+          {%- if result.region == 'active' %}✅{% elif result.region == 'saturation' %}⚠️{% else %}⛔{% endif %}
+          {{ result.region|capitalize }} region
+        </strong>
         <span>{{ result.message }}</span>
       </div>
 
