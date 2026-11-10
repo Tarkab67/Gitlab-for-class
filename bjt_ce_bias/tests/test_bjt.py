@@ -2,6 +2,9 @@ import math
 import unittest
 
 from bjt_ce_bias.bjt import BiasInputs, parse_inputs
+from bjt_ce_bias.bjt import VCE_SAT, classify_vce, solve_bias
+
+DEFAULTS = BiasInputs(vcc=12.0, r1=100e3, r2=22e3, rc=2.2e3, re=1e3, beta=100.0, vbe=0.7)
 
 GOOD = {
     "vcc": "12", "r1": "100", "r2": "22", "rc": "2.2", "re": "1",
@@ -42,3 +45,43 @@ class TestParseInputs(unittest.TestCase):
         inputs, errors = parse_inputs({**GOOD, "vcc": "abc", "re": "0"})
         self.assertIsNone(inputs)
         self.assertEqual(set(errors), {"vcc", "re"})
+
+
+class TestSolveBias(unittest.TestCase):
+    def test_known_active_point(self):
+        r = solve_bias(DEFAULTS)
+        self.assertAlmostEqual(r.ib, 12.2985e-6, delta=1e-7)
+        self.assertAlmostEqual(r.ic, 1.22985e-3, delta=1e-7)
+        self.assertAlmostEqual(r.ie, 1.24215e-3, delta=1e-7)
+        self.assertAlmostEqual(r.ve, 1.24215, delta=1e-4)
+        self.assertAlmostEqual(r.vb, 1.94215, delta=1e-4)
+        self.assertAlmostEqual(r.vc, 9.29433, delta=1e-4)
+        self.assertAlmostEqual(r.vce, 8.05218, delta=1e-4)
+        self.assertEqual(r.region, "active")
+
+    def test_cutoff_when_divider_cannot_bias(self):
+        r = solve_bias(BiasInputs(vcc=12.0, r1=100e3, r2=1e3, rc=4.7e3, re=1e3, beta=100.0, vbe=0.7))
+        self.assertEqual(r.region, "cutoff")
+        self.assertEqual((r.ib, r.ic, r.ie), (0.0, 0.0, 0.0))
+        self.assertAlmostEqual(r.vce, 12.0)
+
+    def test_saturation_when_vce_below_threshold(self):
+        r = solve_bias(BiasInputs(vcc=12.0, r1=100e3, r2=22e3, rc=10e3, re=1e3, beta=100.0, vbe=0.7))
+        self.assertEqual(r.region, "saturation")
+        self.assertLess(r.vce, VCE_SAT)
+
+    def test_extreme_magnitudes_stay_finite(self):
+        for r1, re_ in ((1e-3, 1e-3), (1e9, 1e9), (1e9, 1.0)):
+            with self.subTest(r1=r1, re=re_):
+                r = solve_bias(BiasInputs(12.0, r1, 22e3, 2.2e3, re_, 100.0, 0.7))
+                for value in (r.vb, r.ve, r.vc, r.vce, r.ib, r.ic, r.ie):
+                    self.assertTrue(math.isfinite(value))
+
+    def test_huge_beta_is_handled(self):
+        r = solve_bias(BiasInputs(12.0, 100e3, 22e3, 2.2e3, 1e3, 1e6, 0.7))
+        self.assertIn(r.region, {"active", "saturation", "cutoff"})
+        self.assertTrue(math.isfinite(r.ic))
+
+    def test_saturation_boundary_is_strict(self):
+        self.assertEqual(classify_vce(0.3), "active")
+        self.assertEqual(classify_vce(0.2999999), "saturation")

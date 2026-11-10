@@ -13,6 +13,77 @@ RESISTOR_FIELDS = ("r1", "r2", "rc", "re")
 UNIT_SCALE = {"ohm": 1.0, "kohm": 1e3}
 DEFAULT_UNIT = "kohm"
 
+VCE_SAT = 0.3
+
+REGION_ACTIVE = "active"
+REGION_SATURATION = "saturation"
+REGION_CUTOFF = "cutoff"
+
+
+@dataclass(frozen=True)
+class BiasResult:
+    vb: float
+    ve: float
+    vc: float
+    vce: float
+    ib: float
+    ic: float
+    ie: float
+    region: str
+    message: str
+
+
+def classify_vce(vce: float) -> str:
+    return REGION_SATURATION if vce < VCE_SAT else REGION_ACTIVE
+
+
+def region_message(region: str, vce: float) -> str:
+    if region == REGION_CUTOFF:
+        return "Cutoff: the divider cannot forward-bias the base (transistor off)."
+    if region == REGION_SATURATION:
+        return "Saturation: VCE is below 0.3 V; the linear model overstates IC."
+    return f"Active region approximation OK: VCE = {vce:.2f} V > 0.3 V."
+
+
+def solve_bias(inputs: BiasInputs) -> BiasResult:
+    """Closed-form (Thevenin) operating point of the voltage-divider bias."""
+    vbb = inputs.vcc * inputs.r2 / (inputs.r1 + inputs.r2)
+    rb = inputs.r1 * inputs.r2 / (inputs.r1 + inputs.r2)
+    ib = (vbb - inputs.vbe) / (rb + (inputs.beta + 1.0) * inputs.re)
+
+    if ib <= 0.0:
+        return BiasResult(
+            vb=inputs.vcc,
+            ve=inputs.vcc,
+            vc=inputs.vcc,
+            vce=inputs.vcc,
+            ib=0.0,
+            ic=0.0,
+            ie=0.0,
+            region=REGION_CUTOFF,
+            message=region_message(REGION_CUTOFF, inputs.vcc),
+        )
+
+    ic = inputs.beta * ib
+    ie = (inputs.beta + 1.0) * ib
+    ve = ie * inputs.re
+    vb = ve + inputs.vbe
+    vc = inputs.vcc - ic * inputs.rc
+    vce = vc - ve
+    region = classify_vce(vce)
+    return BiasResult(
+        vb=vb,
+        ve=ve,
+        vc=vc,
+        vce=vce,
+        ib=ib,
+        ic=ic,
+        ie=ie,
+        region=region,
+        message=region_message(region, vce),
+    )
+
+
 
 @dataclass(frozen=True)
 class BiasInputs:
