@@ -27,14 +27,21 @@
   <main class="layout">
     <section class="card" aria-labelledby="inputs-title">
       <h2 id="inputs-title"><span class="card-icon">⚙</span> Input Parameters</h2>
+      {% if errors %}
+      <ul class="errors">
+        {% for field, message in errors.items() %}
+        <li><strong>{{ field|upper }}</strong>: {{ message }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
       <form method="post" action="/">
-        <div class="field-row">
+        <div class="field-row{% if 'vcc' in errors %} has-error{% endif %}">
           <label for="vcc"><i>V<sub>CC</sub></i><small>(Supply Voltage)</small></label>
           <input id="vcc" name="vcc" type="text" inputmode="decimal" value="{{ form.vcc }}">
           <select name="vcc_unit" aria-label="VCC unit"><option value="V">V</option></select>
         </div>
 
-        <div class="field-row">
+        <div class="field-row{% if 'r1' in errors %} has-error{% endif %}">
           <label for="r1"><i>R<sub>1</sub></i><small>(Upper Divider)</small></label>
           <input id="r1" name="r1" type="text" inputmode="decimal" value="{{ form.r1 }}">
           <select name="r1_unit" aria-label="R1 unit">
@@ -43,7 +50,7 @@
           </select>
         </div>
 
-        <div class="field-row">
+        <div class="field-row{% if 'r2' in errors %} has-error{% endif %}">
           <label for="r2"><i>R<sub>2</sub></i><small>(Lower Divider)</small></label>
           <input id="r2" name="r2" type="text" inputmode="decimal" value="{{ form.r2 }}">
           <select name="r2_unit" aria-label="R2 unit">
@@ -52,7 +59,7 @@
           </select>
         </div>
 
-        <div class="field-row">
+        <div class="field-row{% if 'rc' in errors %} has-error{% endif %}">
           <label for="rc"><i>R<sub>C</sub></i><small>(Collector Resistor)</small></label>
           <input id="rc" name="rc" type="text" inputmode="decimal" value="{{ form.rc }}">
           <select name="rc_unit" aria-label="RC unit">
@@ -61,7 +68,7 @@
           </select>
         </div>
 
-        <div class="field-row">
+        <div class="field-row{% if 're' in errors %} has-error{% endif %}">
           <label for="re"><i>R<sub>E</sub></i><small>(Emitter Resistor)</small></label>
           <input id="re" name="re" type="text" inputmode="decimal" value="{{ form.re }}">
           <select name="re_unit" aria-label="RE unit">
@@ -70,13 +77,13 @@
           </select>
         </div>
 
-        <div class="field-row">
+        <div class="field-row{% if 'beta' in errors %} has-error{% endif %}">
           <label for="beta"><i>β</i><small>(Current Gain)</small></label>
           <input id="beta" name="beta" type="text" inputmode="decimal" value="{{ form.beta }}">
           <select name="beta_unit" aria-label="beta unit"><option value="">—</option></select>
         </div>
 
-        <div class="field-row">
+        <div class="field-row{% if 'vbe' in errors %} has-error{% endif %}">
           <label for="vbe"><i>V<sub>BE</sub></i><small>(Base-Emitter Voltage)</small></label>
           <input id="vbe" name="vbe" type="text" inputmode="decimal" value="{{ form.vbe }}">
           <select name="vbe_unit" aria-label="VBE unit"><option value="V">V</option></select>
@@ -95,7 +102,24 @@
 
     <section class="card" id="results" aria-labelledby="results-title">
       <h2 id="results-title"><span class="card-icon">📊</span> DC Bias Results</h2>
+      {% if result %}
+      <table class="results-table">
+        <thead>
+          <tr><th scope="col">Quantity</th><th scope="col">Value</th></tr>
+        </thead>
+        <tbody>
+          {% for label, display, unit in rows %}
+          <tr><th scope="row">{{ label }}</th><td>{{ display }} {{ unit }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <div class="status region-{{ result.region }}">
+        <strong>{{ result.region|capitalize }} region</strong>
+        <span>{{ result.message }}</span>
+      </div>
+      {% else %}
       <p class="placeholder">Enter parameters and press Calculate DC Bias.</p>
+      {% endif %}
     </section>
   </main>
 </body>
