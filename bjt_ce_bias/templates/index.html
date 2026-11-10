@@ -171,6 +171,45 @@
         <strong>{{ result.region|capitalize }} region</strong>
         <span>{{ result.message }}</span>
       </div>
+
+      <div class="crosscheck">
+        <h3>Independent checks</h3>
+        {% if result.region == 'cutoff' %}
+        <p class="muted">n/a — the transistor is off, so there is no operating point to cross-check.</p>
+        {% else %}
+        <table>
+          <tr>
+            <td>Nodal KCL solve</td>
+            <td class="value">IC {{ nodal_view.ic }} · VCE {{ nodal_view.vce }}</td>
+            <td class="{{ 'pass' if nodal_agrees else 'fail' }}">
+              {{ 'pass' if nodal_agrees else 'fail' }}
+            </td>
+          </tr>
+          {% if not spice_available %}
+          <tr>
+            <td colspan="3" class="muted">SPICE not available (optional) — the closed-form and nodal checks still run.</td>
+          </tr>
+          {% elif spice_error %}
+          <tr>
+            <td colspan="3" class="muted">SPICE check failed (optional) — the page still shows the closed-form and nodal results.</td>
+          </tr>
+          {% else %}
+          <tr>
+            <td>SPICE (.op)</td>
+            <td class="value">VBE {{ spice_view.vbe }} · IC {{ spice_view.ic }} · VCE {{ spice_view.vce }}</td>
+            <td class="{{ 'pass' if spice_agrees else 'fail' }}">
+              {{ 'pass' if spice_agrees else 'fail' }}
+            </td>
+          </tr>
+          <tr>
+            <td colspan="3" class="muted">
+              Assumed VBE = 0.700 V (closed form) vs SPICE {{ spice_view.vbe }}; IC/VCE must agree within 15 %.
+            </td>
+          </tr>
+          {% endif %}
+        </table>
+        {% endif %}
+      </div>
       {% else %}
       <p class="placeholder">Enter parameters and press Calculate DC Bias.</p>
       {% endif %}

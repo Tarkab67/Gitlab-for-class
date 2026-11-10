@@ -73,5 +73,28 @@ class TestSchematic(unittest.TestCase):
         self.assertIn("4.7 kΩ", html[start:html.index("</svg>", start)])
 
 
+class TestCrossCheckBlock(unittest.TestCase):
+    def test_nodal_row_rendered(self):
+        html = app.test_client().post("/", data=VALID_FORM).get_data(as_text=True)
+        self.assertIn("Nodal", html)
+        self.assertIn("1.230", html)
+
+    def test_spice_unavailable_is_graceful(self):
+        from unittest.mock import patch
+        with patch("bjt_ce_bias.app.spice.available", return_value=False):
+            response = app.test_client().post("/", data=VALID_FORM)
+            html = response.get_data(as_text=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("SPICE not available", html)
+
+    def test_spice_error_never_breaks_the_page(self):
+        from unittest.mock import patch
+        with patch("bjt_ce_bias.app.spice.available", return_value=True), \
+             patch("bjt_ce_bias.app.spice.run_operating_point", side_effect=RuntimeError("boom")):
+            response = app.test_client().post("/", data=VALID_FORM)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("SPICE check failed", response.get_data(as_text=True))
+
+
 if __name__ == "__main__":
     unittest.main()
