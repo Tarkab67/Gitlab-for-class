@@ -27,3 +27,14 @@ Browser). Design and plan:
 [`docs/superpowers/specs/2026-11-17-lab03-multi-bias-design.md`](docs/superpowers/specs/2026-11-17-lab03-multi-bias-design.md)
 and
 [`docs/superpowers/plans/2026-11-17-lab03-multi-bias.md`](docs/superpowers/plans/2026-11-17-lab03-multi-bias.md).
+
+Repository: <https://github.com/Tarkab67/Gitlab-for-class> (branch `main`).
+The code commit validated in `docs/validation.md` is `1a2e354`; this delivery
+metadata is a later docs-only commit.
+
+**AI assistance:** an AI agent (DeepSeek V4.1 Flash in OpenCode) generated the
+Lab 03 code, test adjustments, plan, README text, and validation document. The
+student must personally verify before submission: read the three equation sets
+against the Lab 03 sheet, run the 37-test command above, and repeat A1–A5 in
+the browser. Details are in the "AI assistance and student checks" section of
+[`docs/validation.md`](docs/validation.md).

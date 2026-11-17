@@ -2,7 +2,10 @@
 
 - **Method:** OpenCode Browser (in-app Chromium, allowed fallback in the Lab 03 sheet)
 - **App URL:** http://127.0.0.1:5000
-- **Code under test:** commit `a670469` (`feat: add bias mode selector and per-mode forms`)
+- **Code under test:** commit `1a2e354` (`fix: reject empty bias mode instead of
+  defaulting to divider`). A1–A5 were observed on `a670469`; the only later code
+  change rejects an empty `mode` field and does not touch the valid-mode path, so
+  the observed values still apply.
 - **Run command:** `.venv\Scripts\python -m bjt_ce_bias.app`
 - **Test command:** `.venv\Scripts\python -m unittest discover -s bjt_ce_bias/tests -t . -v` → 37 tests OK
 - **Tolerance:** IC ±0.01 mA, VCE ±0.02 V (display rounds IC to 0.001 mA and VCE to 0.001 V)

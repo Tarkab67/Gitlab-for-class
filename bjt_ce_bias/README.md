@@ -66,6 +66,14 @@ Then open http://127.0.0.1:5000 and press **Calculate DC Bias**.
 37 tests. Browser validation of A1–A5 is recorded in
 [`../docs/validation.md`](../docs/validation.md).
 
+Repository: <https://github.com/Tarkab67/Gitlab-for-class> (branch `main`).
+Validated code commit: `1a2e354`.
+
+**AI assistance:** the code, tests, and docs were generated with an AI agent
+(DeepSeek V4.1 Flash in OpenCode) and must be checked by the student against
+the Lab 03 sheet before submission. The student checks are listed in the
+validation document.
+
 ## Optional: ngspice
 
 The SPICE check is optional; without it the page shows
