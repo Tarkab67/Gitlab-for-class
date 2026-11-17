@@ -22,6 +22,16 @@ MODE_NAMES = {
     "fixed": "Fixed Bias",
     "emitter": "Emitter Bias",
 }
+SCHEMATIC_FIELDS = {
+    "divider": ("vcc", "r1", "r2", "rc", "re"),
+    "fixed": ("vcc", "rb", "rc"),
+    "emitter": ("vcc", "rb", "rc", "re"),
+}
+PARSERS = {
+    "divider": parse_inputs,
+    "fixed": parse_fixed,
+    "emitter": parse_emitter,
+}
 
 DEFAULT_FORM = {
     "vcc": "12.0",
@@ -54,9 +64,9 @@ def _result_rows(result):
     ]
 
 
-def _schematic(inputs):
+def _schematic(inputs, fields):
     labels = {}
-    for field in ("vcc", "r1", "r2", "rc", "re"):
+    for field in fields:
         display, unit = format_compact(field, getattr(inputs, field))
         labels[field] = f"{display} {unit}".strip()
     labels["beta"] = f"{inputs.beta:.6g}"
@@ -116,15 +126,15 @@ def _verdict_context(result, inputs):
     }
 
 
-def _schematic_inputs(form, errors):
+def _schematic_inputs(mode, form, errors):
     """Keep every valid typed value; fall back per field only for rejected ones."""
     candidate = dict(form)
     for field in errors:
         if field in DEFAULT_FORM:
             candidate[field] = DEFAULT_FORM[field]
-    inputs, _ = parse_inputs(candidate)
+    inputs, _ = PARSERS[mode](candidate)
     if inputs is None:
-        inputs, _ = parse_inputs(DEFAULT_FORM)
+        inputs, _ = PARSERS[mode](DEFAULT_FORM)
     return inputs
 
 
@@ -138,11 +148,11 @@ def _render(mode, form, errors, result=None, inputs=None, forward=None):
         "result": result,
         "rows": _result_rows(result) if result is not None else [],
     }
-    if mode == "divider":
+    if mode in SCHEMATIC_FIELDS:
         if inputs is None:
-            inputs, _ = parse_inputs(DEFAULT_FORM)
-        context["schematic"] = _schematic(inputs)
-        if forward is not None:
+            inputs, _ = PARSERS[mode](DEFAULT_FORM)
+        context["schematic"] = _schematic(inputs, SCHEMATIC_FIELDS[mode])
+        if mode == "divider" and forward is not None:
             context.update(_verdict_context(forward, inputs))
     return render_template("index.html", **context)
 
@@ -160,15 +170,8 @@ def index():
         return _render(None, {}, {"form": f"Unknown bias mode: {mode}."}), 400
 
     form = {**DEFAULT_FORM, **request.form.to_dict()}
-    if mode == "divider":
-        inputs, errors = parse_inputs(form)
-        schematic_inputs = _schematic_inputs(form, errors)
-    elif mode == "fixed":
-        inputs, errors = parse_fixed(form)
-        schematic_inputs = None
-    else:
-        inputs, errors = parse_emitter(form)
-        schematic_inputs = None
+    inputs, errors = PARSERS[mode](form)
+    schematic_inputs = _schematic_inputs(mode, form, errors)
 
     if inputs is None:
         return _render(mode, form, errors, inputs=schematic_inputs)
@@ -185,7 +188,7 @@ def index():
         form,
         {},
         result,
-        inputs=inputs if mode == "divider" else None,
+        inputs=inputs,
         forward=forward,
     )
 
