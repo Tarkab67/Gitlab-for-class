@@ -10,7 +10,7 @@ class TestPageShell(unittest.TestCase):
 
     def test_get_renders_three_cards_and_form(self):
         html = self.client.get("/").get_data(as_text=True)
-        self.assertIn("Lab 02: BJT DC Bias Web App", html)
+        self.assertIn("Lab 03: BJT DC Bias Web App", html)
         self.assertIn("Input Parameters", html)
         self.assertIn("Circuit", html)
         self.assertIn("DC Bias Results", html)

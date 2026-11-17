@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Lab 02: BJT DC Bias Web App</title>
+  <title>Lab 03: BJT DC Bias Web App</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -14,8 +14,8 @@
         <path d="M12 2v6M20 2v6M12 24v6M20 24v6M2 12h6M2 20h6M24 12h6M24 20h6"></path>
       </svg>
       <div>
-        <h1>Lab 02: BJT DC Bias Web App</h1>
-        <p class="subtitle">ENG29 2121 – Common Emitter (Voltage Divider Bias)</p>
+        <h1>Lab 03: BJT DC Bias Web App</h1>
+        <p class="subtitle">ENG29 2121 – Common Emitter (Fixed, Emitter, Voltage Divider Bias)</p>
       </div>
     </div>
     <div class="course-badge">
@@ -34,13 +34,25 @@
         {% endfor %}
       </ul>
       {% endif %}
+      <form method="get" action="/" class="mode-switch">
+        <label for="mode">Bias mode</label>
+        <select id="mode" name="mode">
+          {% for value, label in mode_options %}
+          <option value="{{ value }}" {% if mode == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="load-mode">Load mode</button>
+      </form>
+      {% if mode %}
       <form method="post" action="/">
+        <input type="hidden" name="mode" value="{{ mode }}">
         <div class="field-row{% if 'vcc' in errors %} has-error{% endif %}">
           <label for="vcc"><i>V<sub>CC</sub></i><small>(Supply Voltage)</small></label>
           <input id="vcc" name="vcc" type="text" inputmode="decimal" value="{{ form.vcc }}">
           <select name="vcc_unit" aria-label="VCC unit"><option value="V">V</option></select>
         </div>
 
+        {% if mode == 'divider' %}
         <div class="field-row{% if 'r1' in errors %} has-error{% endif %}">
           <label for="r1"><i>R<sub>1</sub></i><small>(Upper Divider)</small></label>
           <input id="r1" name="r1" type="text" inputmode="decimal" value="{{ form.r1 }}">
@@ -58,6 +70,29 @@
             <option value="ohm" {% if form.r2_unit == 'ohm' %}selected{% endif %}>Ω</option>
           </select>
         </div>
+        {% endif %}
+
+        {% if mode == 'fixed' or mode == 'emitter' %}
+        <div class="field-row{% if 'rb' in errors %} has-error{% endif %}">
+          <label for="rb"><i>R<sub>B</sub></i><small>(Base Resistor)</small></label>
+          <input id="rb" name="rb" type="text" inputmode="decimal" value="{{ form.rb }}">
+          <select name="rb_unit" aria-label="RB unit">
+            <option value="kohm" {% if form.rb_unit == 'kohm' %}selected{% endif %}>kΩ</option>
+            <option value="ohm" {% if form.rb_unit == 'ohm' %}selected{% endif %}>Ω</option>
+          </select>
+        </div>
+        {% endif %}
+
+        {% if mode == 'emitter' %}
+        <div class="field-row{% if 're' in errors %} has-error{% endif %}">
+          <label for="re"><i>R<sub>E</sub></i><small>(Emitter Resistor)</small></label>
+          <input id="re" name="re" type="text" inputmode="decimal" value="{{ form.re }}">
+          <select name="re_unit" aria-label="RE unit">
+            <option value="kohm" {% if form.re_unit == 'kohm' %}selected{% endif %}>kΩ</option>
+            <option value="ohm" {% if form.re_unit == 'ohm' %}selected{% endif %}>Ω</option>
+          </select>
+        </div>
+        {% endif %}
 
         <div class="field-row{% if 'rc' in errors %} has-error{% endif %}">
           <label for="rc"><i>R<sub>C</sub></i><small>(Collector Resistor)</small></label>
@@ -68,6 +103,7 @@
           </select>
         </div>
 
+        {% if mode == 'divider' %}
         <div class="field-row{% if 're' in errors %} has-error{% endif %}">
           <label for="re"><i>R<sub>E</sub></i><small>(Emitter Resistor)</small></label>
           <input id="re" name="re" type="text" inputmode="decimal" value="{{ form.re }}">
@@ -76,6 +112,7 @@
             <option value="ohm" {% if form.re_unit == 'ohm' %}selected{% endif %}>Ω</option>
           </select>
         </div>
+        {% endif %}
 
         <div class="field-row{% if 'beta' in errors %} has-error{% endif %}">
           <label for="beta"><i>β</i><small>(Current Gain)</small></label>
@@ -91,8 +128,10 @@
 
         <button type="submit" class="calculate">Calculate DC Bias</button>
       </form>
+      {% endif %}
     </section>
 
+    {% if mode == 'divider' %}
     <section class="card" aria-labelledby="circuit-title">
       <h2 id="circuit-title"><span class="card-icon">🔀</span> Circuit: Common-Emitter Amplifier</h2>
       <div class="schematic">
@@ -153,9 +192,10 @@
         </svg>
       </div>
     </section>
+    {% endif %}
 
     <section class="card" id="results" aria-labelledby="results-title">
-      <h2 id="results-title"><span class="card-icon">📊</span> DC Bias Results</h2>
+      <h2 id="results-title"><span class="card-icon">📊</span> DC Bias Results{% if mode_name %} — {{ mode_name }}{% endif %}</h2>
       {% if result %}
       <table class="results-table">
         <thead>
@@ -167,6 +207,7 @@
           {% endfor %}
         </tbody>
       </table>
+      {% if mode == 'divider' %}
       <div class="status region-{{ result.region }}">
         <strong>
           {%- if result.region == 'active' %}✅{% elif result.region == 'saturation' %}⚠️{% else %}⛔{% endif %}
@@ -174,7 +215,16 @@
         </strong>
         <span>{{ result.message }}</span>
       </div>
+      {% endif %}
 
+      {% if result.warning %}
+      <div class="status status-warning">
+        <strong>⚠️ Model limit</strong>
+        <span>{{ result.warning }}</span>
+      </div>
+      {% endif %}
+
+      {% if mode == 'divider' %}
       <div class="crosscheck">
         <h3>Independent checks</h3>
         {% if result.region == 'cutoff' %}
@@ -213,6 +263,7 @@
         </table>
         {% endif %}
       </div>
+      {% endif %}
       {% else %}
       <p class="placeholder">Enter parameters and press Calculate DC Bias.</p>
       {% endif %}

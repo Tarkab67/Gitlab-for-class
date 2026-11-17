@@ -133,6 +133,40 @@ body {
 .field-row select:focus { outline: 2px solid rgba(0, 121, 107, 0.35); border-color: var(--teal); }
 .field-row.has-error input { border-color: var(--bad-ink); background: #fff7f6; }
 
+.mode-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.mode-switch label {
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.mode-switch select {
+  flex: 1;
+  padding: 7px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font: inherit;
+  background: #fff;
+}
+
+.load-mode {
+  padding: 7px 12px;
+  border: 1px solid var(--teal);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--teal);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.load-mode:hover { background: #e6f4ea; }
+
 .calculate {
   width: 100%;
   margin-top: 8px;
@@ -184,6 +218,7 @@ body {
 .region-active { background: var(--ok-bg); color: var(--ok-ink); border-color: #b7dfc0; }
 .region-saturation { background: var(--warn-bg); color: var(--warn-ink); border-color: #f0d3a8; }
 .region-cutoff { background: var(--bad-bg); color: var(--bad-ink); border-color: #f3c2be; }
+.status-warning { background: var(--warn-bg); color: var(--warn-ink); border-color: #f0d3a8; }
 
 .errors {
   margin: 0 0 10px;

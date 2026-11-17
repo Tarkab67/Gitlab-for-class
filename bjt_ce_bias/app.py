@@ -5,40 +5,52 @@ from __future__ import annotations
 from flask import Flask, render_template, request
 
 from bjt_ce_bias import spice
-from bjt_ce_bias.bjt import cross_check, nodal_solve, parse_inputs, solve_bias
+from bjt_ce_bias.bjt import (
+    cross_check,
+    nodal_solve,
+    parse_emitter,
+    parse_fixed,
+    parse_inputs,
+    solve_bias_forward,
+    solve_operating_point,
+)
 from bjt_ce_bias.formatting import format_compact, format_quantity
+
+MODES = ("divider", "fixed", "emitter")
+MODE_NAMES = {
+    "divider": "Voltage Divider Bias",
+    "fixed": "Fixed Bias",
+    "emitter": "Emitter Bias",
+}
 
 DEFAULT_FORM = {
     "vcc": "12.0",
     "r1": "100",
     "r2": "22",
+    "rb": "1000",
     "rc": "2.2",
     "re": "1.0",
     "beta": "100",
     "vbe": "0.70",
     "r1_unit": "kohm",
     "r2_unit": "kohm",
+    "rb_unit": "kohm",
     "rc_unit": "kohm",
     "re_unit": "kohm",
 }
-
-RESULT_ROWS = (
-    ("VB", "vb"),
-    ("VE", "ve"),
-    ("VC", "vc"),
-    ("VCE", "vce"),
-    ("IB", "ib"),
-    ("IC", "ic"),
-    ("IE", "ie"),
-)
 
 app = Flask(__name__)
 
 
 def _result_rows(result):
     return [
-        (label, *format_quantity(field, getattr(result, field)))
-        for label, field in RESULT_ROWS
+        ("VB", *format_quantity("vb", result["vb_v"])),
+        ("VE", *format_quantity("ve", result["ve_v"])),
+        ("VC", *format_quantity("vc", result["vc_v"])),
+        ("VCE", *format_quantity("vce", result["vce_v"])),
+        ("IB", *format_quantity("ib", result["ib_a"])),
+        ("IC", f"{result['ic_ma']:.3f}", "mA"),
+        ("IE", f"{result['ie_ma']:.3f}", "mA"),
     ]
 
 
@@ -116,36 +128,66 @@ def _schematic_inputs(form, errors):
     return inputs
 
 
-def _render(form, errors, result=None, inputs=None):
-    if inputs is None:
-        inputs, _ = parse_inputs(DEFAULT_FORM)
-    checks = _verdict_context(result, inputs) if result is not None else {}
-    return render_template(
-        "index.html",
-        form=form,
-        errors=errors,
-        result=result,
-        rows=_result_rows(result) if result is not None else [],
-        schematic=_schematic(inputs),
-        **checks,
-    )
+def _render(mode, form, errors, result=None, inputs=None, forward=None):
+    context = {
+        "mode": mode,
+        "mode_name": MODE_NAMES.get(mode, ""),
+        "mode_options": tuple(MODE_NAMES.items()),
+        "form": form,
+        "errors": errors,
+        "result": result,
+        "rows": _result_rows(result) if result is not None else [],
+    }
+    if mode == "divider":
+        if inputs is None:
+            inputs, _ = parse_inputs(DEFAULT_FORM)
+        context["schematic"] = _schematic(inputs)
+        if forward is not None:
+            context.update(_verdict_context(forward, inputs))
+    return render_template("index.html", **context)
 
 
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "GET":
-        return _render(DEFAULT_FORM, {})
+        mode = request.args.get("mode", "divider")
+        if mode not in MODES:
+            return _render(None, {}, {"form": f"Unknown bias mode: {mode}."}), 400
+        return _render(mode, DEFAULT_FORM, {})
+
+    mode = request.form.get("mode") or "divider"
+    if mode not in MODES:
+        return _render(None, {}, {"form": f"Unknown bias mode: {mode}."}), 400
 
     form = {**DEFAULT_FORM, **request.form.to_dict()}
-    inputs, errors = parse_inputs(form)
+    if mode == "divider":
+        inputs, errors = parse_inputs(form)
+        schematic_inputs = _schematic_inputs(form, errors)
+    elif mode == "fixed":
+        inputs, errors = parse_fixed(form)
+        schematic_inputs = None
+    else:
+        inputs, errors = parse_emitter(form)
+        schematic_inputs = None
+
     if inputs is None:
-        return _render(form, errors, inputs=_schematic_inputs(form, errors))
+        return _render(mode, form, errors, inputs=schematic_inputs)
+
     try:
-        result = solve_bias(inputs)
+        result = solve_operating_point(mode, inputs)
+        forward = solve_bias_forward(inputs) if mode == "divider" else None
     except ValueError:
         message = "These values do not produce a finite operating point; check the magnitudes."
-        return _render(form, {"form": message}, inputs=inputs)
-    return _render(form, {}, result, inputs)
+        return _render(mode, form, {"form": message}, inputs=schematic_inputs)
+
+    return _render(
+        mode,
+        form,
+        {},
+        result,
+        inputs=inputs if mode == "divider" else None,
+        forward=forward,
+    )
 
 
 if __name__ == "__main__":
