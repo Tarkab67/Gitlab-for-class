@@ -76,6 +76,9 @@ a real browser (A1–A5), not new unit tests.
   the absence of "Nodal KCL solve").
 - **Circuit card (decided):** shown unchanged for divider; hidden entirely for
   Fixed and Emitter. No new SVGs this week (out of the lab scope).
+  **Superseded 2026-11-17:** the circuit card is now shown for every mode, with
+  live-value SVGs for Fixed and Emitter — see
+  `2026-11-17-lab03-circuit-diagrams-design.md`.
 - **Page identity (decided):** title and `<h1>` become
   "Lab 03: BJT DC Bias Web App", subtitle "ENG29 2121 – Common Emitter
   (Fixed, Emitter, Voltage Divider Bias)". The single assertion in

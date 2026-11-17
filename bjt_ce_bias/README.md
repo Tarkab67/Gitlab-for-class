@@ -19,6 +19,11 @@ All modes: `IC = β·IB`, `IE = (β+1)·IB`, `VE = IE·RE`, `VB = VE + VBE`,
 
 The mode selector reloads the form so only the needed fields appear (no
 JavaScript). The equations live in `bjt.py`; the template never computes them.
+The Circuit card is drawn for all three modes with the values entered: Fixed
+shows `RB` from VCC to base, `RC` to the collector and the emitter tied to
+ground; Emitter adds `RE` from emitter to ground; Divider keeps its Lab 02
+diagram. A rejected field falls back to its default only in the diagram while
+the form keeps the typed value.
 
 ## Voltage-divider independent checks (Lab 02)
 
