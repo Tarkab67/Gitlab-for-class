@@ -39,7 +39,7 @@ def classify_vce(vce: float) -> str:
 
 def region_message(region: str, vce: float) -> str:
     if region == REGION_CUTOFF:
-        return "Cutoff: the divider cannot forward-bias the base (transistor off)."
+        return "Cutoff: the base cannot be forward-biased (transistor off)."
     if region == REGION_SATURATION:
         return "Saturation: VCE is below 0.2 V; the linear model overstates IC."
     return f"Active region approximation OK: VCE = {vce:.2f} V ≥ 0.2 V."

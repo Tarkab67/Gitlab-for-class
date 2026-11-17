@@ -7,6 +7,16 @@
 - **Test command:** `.venv\Scripts\python -m unittest discover -s bjt_ce_bias/tests -t . -v` → 37 tests OK
 - **Tolerance:** IC ±0.01 mA, VCE ±0.02 V (display rounds IC to 0.001 mA and VCE to 0.001 V)
 
+Why this method: the Lab 03 sheet allows the in-app browser and the course
+constraint forbids adding a Playwright script, so the A1–A5 run above was done
+by hand in OpenCode Browser on the same commit the tests cover.
+
+Implementation pointers for anyone checking the numbers: mode dispatch is
+`solve_operating_point()` in `bjt_ce_bias/bjt.py`, the per-mode parsers are
+`parse_inputs` / `parse_fixed` / `parse_emitter` in the same file, and the Ω/kΩ
+scaling is `UNIT_SCALE` applied by `_parse_resistors` (form values are scaled to
+SI ohms before the equations run).
+
 Shared inputs unless stated: VCC = 12 V, RC = 2.2 kΩ, β = 100, VBE = 0.70 V.
 
 ## Results

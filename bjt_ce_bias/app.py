@@ -155,7 +155,7 @@ def index():
             return _render(None, {}, {"form": f"Unknown bias mode: {mode}."}), 400
         return _render(mode, DEFAULT_FORM, {})
 
-    mode = request.form.get("mode") or "divider"
+    mode = request.form.get("mode", "divider")
     if mode not in MODES:
         return _render(None, {}, {"form": f"Unknown bias mode: {mode}."}), 400
 
