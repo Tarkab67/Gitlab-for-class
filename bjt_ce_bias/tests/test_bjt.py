@@ -94,8 +94,8 @@ class TestSolveBias(unittest.TestCase):
         self.assertTrue(math.isfinite(r.ic))
 
     def test_saturation_boundary_is_strict(self):
-        self.assertEqual(classify_vce(0.3), "active")
-        self.assertEqual(classify_vce(0.2999999), "saturation")
+        self.assertEqual(classify_vce(0.2), "active")
+        self.assertEqual(classify_vce(0.1999999), "saturation")
 
 
 class TestNodalSolve(unittest.TestCase):

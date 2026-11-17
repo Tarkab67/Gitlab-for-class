@@ -5,7 +5,7 @@ from __future__ import annotations
 VOLTAGE_FIELDS = {"vcc", "vbe", "vb", "ve", "vc", "vce"}
 MICROAMP_FIELDS = {"ib"}
 MILLIAMP_FIELDS = {"ic", "ie"}
-RESISTOR_FIELDS = {"r1", "r2", "rc", "re"}
+RESISTOR_FIELDS = {"r1", "r2", "rb", "rc", "re"}
 
 
 def format_quantity(quantity: str, value_si: float) -> tuple[str, str]:

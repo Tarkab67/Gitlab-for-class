@@ -13,7 +13,7 @@ RESISTOR_FIELDS = ("r1", "r2", "rc", "re")
 UNIT_SCALE = {"ohm": 1.0, "kohm": 1e3}
 DEFAULT_UNIT = "kohm"
 
-VCE_SAT = 0.3
+VCE_SAT = 0.2
 
 REGION_ACTIVE = "active"
 REGION_SATURATION = "saturation"
@@ -41,15 +41,16 @@ def region_message(region: str, vce: float) -> str:
     if region == REGION_CUTOFF:
         return "Cutoff: the divider cannot forward-bias the base (transistor off)."
     if region == REGION_SATURATION:
-        return "Saturation: VCE is below 0.3 V; the linear model overstates IC."
-    return f"Active region approximation OK: VCE = {vce:.2f} V ≥ 0.3 V."
+        return "Saturation: VCE is below 0.2 V; the linear model overstates IC."
+    return f"Active region approximation OK: VCE = {vce:.2f} V ≥ 0.2 V."
 
 
-def solve_bias(inputs: BiasInputs) -> BiasResult:
-    """Closed-form (Thevenin) operating point of the voltage-divider bias.
+def solve_bias_forward(inputs: BiasInputs) -> BiasResult:
+    """Forward-active operating point of the voltage-divider bias.
 
     The currents are computed from the collector side so that very large
-    beta values (where beta * IB would overflow) stay finite.
+    beta values (where beta * IB would overflow) stay finite. The cutoff
+    case is reported as-is (no zeroing); the Lab 02 wrapper adds the clamp.
     """
     vbb = inputs.vcc * inputs.r2 / (inputs.r1 + inputs.r2)
     rb = 1.0 / (1.0 / inputs.r1 + 1.0 / inputs.r2)
@@ -57,18 +58,6 @@ def solve_bias(inputs: BiasInputs) -> BiasResult:
 
     if not math.isfinite(ic):
         raise ValueError("operating point is not finite; check the input magnitudes")
-    if ic <= 0.0:
-        return BiasResult(
-            vb=inputs.vcc,
-            ve=inputs.vcc,
-            vc=inputs.vcc,
-            vce=inputs.vcc,
-            ib=0.0,
-            ic=0.0,
-            ie=0.0,
-            region=REGION_CUTOFF,
-            message=region_message(REGION_CUTOFF, inputs.vcc),
-        )
 
     ib = ic / inputs.beta
     ie = ic + ib
@@ -78,7 +67,7 @@ def solve_bias(inputs: BiasInputs) -> BiasResult:
     vce = vc - ve
     if not all(math.isfinite(v) for v in (vb, ve, vc, vce, ib, ie)):
         raise ValueError("operating point is not finite; check the input magnitudes")
-    region = classify_vce(vce)
+    region = REGION_CUTOFF if ic <= 0.0 else classify_vce(vce)
     return BiasResult(
         vb=vb,
         ve=ve,
@@ -90,6 +79,127 @@ def solve_bias(inputs: BiasInputs) -> BiasResult:
         region=region,
         message=region_message(region, vce),
     )
+
+
+def solve_bias(inputs: BiasInputs) -> BiasResult:
+    """Lab 02 solver: forward-active point, clamped to zero in cutoff.
+
+    Kept for the existing tests and the divider cross-check.
+    """
+    forward = solve_bias_forward(inputs)
+    if forward.region != REGION_CUTOFF:
+        return forward
+    return BiasResult(
+        vb=inputs.vcc,
+        ve=inputs.vcc,
+        vc=inputs.vcc,
+        vce=inputs.vcc,
+        ib=0.0,
+        ic=0.0,
+        ie=0.0,
+        region=REGION_CUTOFF,
+        message=region_message(REGION_CUTOFF, inputs.vcc),
+    )
+
+
+def warning_for(ib: float, vce: float) -> str | None:
+    """Warn when the forward-active assumption is outside its model limit."""
+    reasons = []
+    if ib <= 0:
+        reasons.append("IB ≤ 0")
+    if vce <= VCE_SAT:
+        reasons.append(f"VCE ≤ {VCE_SAT:.1f} V")
+    if not reasons:
+        return None
+    return ("The forward-active model may not apply: " + ", ".join(reasons)
+            + ". Cutoff/saturation are not calculated.")
+
+
+def _operating_point(
+    mode: str,
+    *,
+    vcc: float,
+    rc: float,
+    beta: float,
+    vbe: float,
+    ib: float,
+    re: float,
+) -> dict:
+    """Build the shared result dict from a forward-active base current."""
+    ic = beta * ib
+    ie = (beta + 1.0) * ib
+    ve = ie * re
+    vb = ve + vbe
+    vc = vcc - ic * rc
+    vce = vc - ve
+    if not all(math.isfinite(v) for v in (vb, ve, vc, vce, ib, ic, ie)):
+        raise ValueError("operating point is not finite; check the input magnitudes")
+    region = REGION_CUTOFF if ib <= 0.0 else classify_vce(vce)
+    return {
+        "mode": mode,
+        "vb_v": vb,
+        "ve_v": ve,
+        "vc_v": vc,
+        "vce_v": vce,
+        "ib_a": ib,
+        "ic_ma": ic * 1e3,
+        "ie_ma": ie * 1e3,
+        "warning": warning_for(ib, vce),
+        "region": region,
+        "message": region_message(region, vce),
+    }
+
+
+def solve_fixed_bias(inputs: FixedBiasInputs) -> dict:
+    """Fixed bias: base resistor from VCC, emitter grounded."""
+    ib = (inputs.vcc - inputs.vbe) / inputs.rb
+    return _operating_point(
+        "fixed",
+        vcc=inputs.vcc,
+        rc=inputs.rc,
+        beta=inputs.beta,
+        vbe=inputs.vbe,
+        ib=ib,
+        re=0.0,
+    )
+
+
+def solve_emitter_bias(inputs: EmitterBiasInputs) -> dict:
+    """Emitter bias: RB from VCC to base, RE from emitter to ground."""
+    ib = ((inputs.vcc - inputs.vbe) / inputs.beta) / (
+        inputs.rb / inputs.beta + inputs.re * (1.0 + 1.0 / inputs.beta)
+    )
+    return _operating_point(
+        "emitter",
+        vcc=inputs.vcc,
+        rc=inputs.rc,
+        beta=inputs.beta,
+        vbe=inputs.vbe,
+        ib=ib,
+        re=inputs.re,
+    )
+
+
+def solve_operating_point(
+    mode: str, inputs: BiasInputs | FixedBiasInputs | EmitterBiasInputs
+) -> dict:
+    """Dispatch to the selected bias mode; never fall back silently."""
+    if mode == "divider":
+        forward = solve_bias_forward(inputs)
+        return _operating_point(
+            "divider",
+            vcc=inputs.vcc,
+            rc=inputs.rc,
+            beta=inputs.beta,
+            vbe=inputs.vbe,
+            ib=forward.ib,
+            re=inputs.re,
+        )
+    if mode == "fixed":
+        return solve_fixed_bias(inputs)
+    if mode == "emitter":
+        return solve_emitter_bias(inputs)
+    raise ValueError(f"unknown bias mode: {mode}")
 
 
 CROSS_FIELDS = ("ib", "ic", "ie", "vce")
@@ -183,6 +293,25 @@ class BiasInputs:
     vbe: float
 
 
+@dataclass(frozen=True)
+class FixedBiasInputs:
+    vcc: float
+    rb: float
+    rc: float
+    beta: float
+    vbe: float
+
+
+@dataclass(frozen=True)
+class EmitterBiasInputs:
+    vcc: float
+    rb: float
+    rc: float
+    re: float
+    beta: float
+    vbe: float
+
+
 def _number(raw: Mapping[str, str], field: str, errors: dict[str, str]) -> float | None:
     text = (raw.get(field) or "").strip()
     try:
@@ -204,16 +333,30 @@ def _scale(raw: Mapping[str, str], field: str, errors: dict[str, str]) -> float 
     return scale
 
 
-def parse_inputs(raw: Mapping[str, str]) -> tuple[BiasInputs | None, dict[str, str]]:
-    """Parse and validate raw form data, scaling resistors to ohms."""
-    errors: dict[str, str] = {}
-
+def _parse_common(
+    raw: Mapping[str, str], errors: dict[str, str]
+) -> tuple[float | None, float | None, float | None]:
+    """Parse VCC, beta, and VBE shared by every bias mode."""
     vcc = _number(raw, "vcc", errors)
     if vcc is not None and vcc <= 0:
         errors["vcc"] = "VCC must be greater than 0 V"
 
-    resistors: dict[str, float] = {}
-    for field in RESISTOR_FIELDS:
+    beta = _number(raw, "beta", errors)
+    if beta is not None and beta <= 1:
+        errors["beta"] = "beta must be greater than 1"
+
+    vbe = _number(raw, "vbe", errors)
+    if vbe is not None and not (0.0 <= vbe <= 1.0):
+        errors["vbe"] = "VBE must be between 0 and 1 V"
+    return vcc, beta, vbe
+
+
+def _parse_resistors(
+    raw: Mapping[str, str], errors: dict[str, str], fields: tuple[str, ...]
+) -> dict[str, float]:
+    """Parse the resistor fields a mode needs and scale them to ohms."""
+    values: dict[str, float] = {}
+    for field in fields:
         value = _number(raw, field, errors)
         if value is None:
             continue
@@ -227,24 +370,61 @@ def parse_inputs(raw: Mapping[str, str]) -> tuple[BiasInputs | None, dict[str, s
         if ohms <= 0:
             errors[field] = f"{field.upper()} must be greater than 0 Ω"
             continue
-        resistors[field] = ohms
+        values[field] = ohms
+    return values
 
-    beta = _number(raw, "beta", errors)
-    if beta is not None and beta <= 1:
-        errors["beta"] = "beta must be greater than 1"
 
-    vbe = _number(raw, "vbe", errors)
-    if vbe is not None and not (0.0 <= vbe <= 1.0):
-        errors["vbe"] = "VBE must be between 0 and 1 V"
-
+def parse_inputs(raw: Mapping[str, str]) -> tuple[BiasInputs | None, dict[str, str]]:
+    """Parse and validate raw form data, scaling resistors to ohms."""
+    errors: dict[str, str] = {}
+    vcc, beta, vbe = _parse_common(raw, errors)
+    resistors = _parse_resistors(raw, errors, RESISTOR_FIELDS)
     if errors:
         return None, errors
-
     return (
         BiasInputs(
             vcc=vcc,
             r1=resistors["r1"],
             r2=resistors["r2"],
+            rc=resistors["rc"],
+            re=resistors["re"],
+            beta=beta,
+            vbe=vbe,
+        ),
+        {},
+    )
+
+
+def parse_fixed(raw: Mapping[str, str]) -> tuple[FixedBiasInputs | None, dict[str, str]]:
+    """Parse the fixed-bias form (VCC, RB, RC, beta, VBE)."""
+    errors: dict[str, str] = {}
+    vcc, beta, vbe = _parse_common(raw, errors)
+    resistors = _parse_resistors(raw, errors, ("rb", "rc"))
+    if errors:
+        return None, errors
+    return (
+        FixedBiasInputs(
+            vcc=vcc,
+            rb=resistors["rb"],
+            rc=resistors["rc"],
+            beta=beta,
+            vbe=vbe,
+        ),
+        {},
+    )
+
+
+def parse_emitter(raw: Mapping[str, str]) -> tuple[EmitterBiasInputs | None, dict[str, str]]:
+    """Parse the emitter-bias form (VCC, RB, RC, RE, beta, VBE)."""
+    errors: dict[str, str] = {}
+    vcc, beta, vbe = _parse_common(raw, errors)
+    resistors = _parse_resistors(raw, errors, ("rb", "re", "rc"))
+    if errors:
+        return None, errors
+    return (
+        EmitterBiasInputs(
+            vcc=vcc,
+            rb=resistors["rb"],
             rc=resistors["rc"],
             re=resistors["re"],
             beta=beta,
